@@ -5,6 +5,8 @@ module Rack
     class Endpoint
 
       module Connection
+        # NOTE Mongo 2.x has no DEFAULT_PORT defined
+        DEFAULT_PORT = 27017
         def initialize(*)
           super
 
@@ -15,7 +17,7 @@ module Rack
         def default_options
           super.merge({
             :hostname => 'localhost',
-            :port     => Mongo::Connection::DEFAULT_PORT
+            :port     => DEFAULT_PORT
           })
         end
 
@@ -29,8 +31,10 @@ module Rack
           database = nil
 
           Timeout::timeout(5) do
-            database = Mongo::Connection.new(@hostname, @port).db(@database)
-            database.authenticate(@username, @password) if @username
+            options = {database: @database}
+            options = options.merge(user: @username, password: @password) if @username
+            database = Mongo::Client.new(["#{@hostname}:#{@port}"], options).database
+            # database.authenticate(@username, @password) if @username
           end
 
           return database

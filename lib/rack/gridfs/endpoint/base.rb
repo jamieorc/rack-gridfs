@@ -33,15 +33,17 @@ module Rack
           {
             :lookup => :id,
             :mapper => lambda { |path| %r!/(.+)!.match(path)[1] },
-            :fs_name => Mongo::Grid::DEFAULT_FS_NAME
+            :fs_name => Mongo::Grid::FSBucket::DEFAULT_ROOT
           }
         end
 
         def with_rescues
+          bson_major_version = BSON::VERSION.split(".").first.to_i
+          bson_error = bson_major_version < 5 ? BSON::ObjectId::Invalid : BSON::Error::InvalidObjectId
           rescue_connection_failure { yield }
-        rescue Mongo::GridFileNotFound, BSON::InvalidObjectId => e
+        rescue Mongo::Error::FileNotFound, bson_error => e
           [ 404, {'Content-Type' => 'text/plain'}, ["File not found. #{e}"] ]
-        rescue Mongo::GridError => e
+        rescue Mongo::Error => e
           [ 500, {'Content-Type' => 'text/plain'}, ["An error occured. #{e}"] ]
         end
 
@@ -49,7 +51,8 @@ module Rack
           retries = 0
           begin
             yield
-          rescue Mongo::ConnectionFailure => e
+          rescue Mongo::Error::ConnectionPerished => e
+          # Mongo::Error::ConnectionUnavailable, available >=2.19
             retries += 1
             raise e if retries > max_retries
             sleep(0.5)
@@ -64,15 +67,15 @@ module Rack
         def find_file(id_or_path)
           case @lookup.to_sym
           when :id
-            Mongo::Grid.new(db, @fs_name).get(BSON::ObjectId.from_string(id_or_path))
+            db.fs(fs_name: @fs_name).open_download_stream(BSON::ObjectId.from_string(id_or_path))
           when :path
             path = CGI::unescape(id_or_path)
-            Mongo::GridFileSystem.new(db, @fs_name).open(path, "r")
+            db.fs(fs_name: @fs_name).open_download_stream_by_name(path)
           end
         end
 
         def headers(file)
-          { 'Content-Type' => file.content_type }
+          { 'Content-Type' => file.file_info.content_type }
         end
 
       end

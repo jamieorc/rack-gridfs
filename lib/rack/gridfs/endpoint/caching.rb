@@ -12,8 +12,8 @@ module Rack
 
         def headers(file)
           super.merge(
-            'Last-Modified' => file.upload_date.httpdate,
-            'Etag'          => file.files_id.to_s
+            'Last-Modified' => file.file_info.upload_date.httpdate,
+            'Etag'          => file.file_id.to_s
           ).merge(cache_control_header)
         end
 
