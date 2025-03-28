@@ -1,4 +1,4 @@
-require 'test_helper'
+require_relative './test_helper'
 
 class ConfigTest < Minitest::Test
   include Rack::Test::Methods
@@ -37,7 +37,7 @@ class ConfigTest < Minitest::Test
 
       should "have a default port" do
         mware = Rack::GridFS::Endpoint.new(@options.except(:port))
-        assert_equal Mongo::Connection::DEFAULT_PORT, mware.instance_variable_get(:@port)
+        assert_equal 27017, mware.instance_variable_get(:@port)
       end
 
       should "have a database option" do
@@ -110,4 +110,3 @@ class ConfigTest < Minitest::Test
   end
 
 end
-

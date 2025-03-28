@@ -1,4 +1,4 @@
-require 'test_helper'
+require_relative './test_helper'
 
 class ExceptionsTest < Minitest::Test
   include Rack::Test::Methods
@@ -7,27 +7,25 @@ class ExceptionsTest < Minitest::Test
   context "Rack::GridFS Exceptions" do
     setup do
       def app
-        setup_middleware(:lookup => :path)
+        setup_middleware(lookup: :path)
       end
 
-      @text_file = load_artifact('test.txt', nil)
-      @html_file = load_artifact('test.html', nil)
+      @text_file = load_artifact_return_stream('test.txt', nil)
     end
 
     teardown do
-      db.collection('fs.files').remove
+      db["fs.files"].delete_many
     end
 
     should "return a 500 if an error occurs" do
-      Rack::GridFS::Endpoint.any_instance.stubs(:find_file).raises(Mongo::GridError)
+      Rack::GridFS::Endpoint.any_instance.stubs(:find_file).raises(Mongo::Error)
 
       get "/gridfs/anything"
       assert_equal 500, last_response.status
     end
 
     should "retry on connection failure" do
-      gridfile = Mongo::GridFileSystem.new(db).open("test.txt", "r")
-      Rack::GridFS::Endpoint.any_instance.stubs(:find_file).raises(Mongo::ConnectionFailure).then.returns(gridfile)
+      Rack::GridFS::Endpoint.any_instance.stubs(:find_file).raises(Mongo::Error::ConnectionPerished).then.returns(@text_file)
 
       get "/gridfs/test.txt"
       assert last_response.ok?

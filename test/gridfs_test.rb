@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-require 'test_helper'
+require_relative './test_helper'
 require 'pp'
 
 class Rack::GridFSTest < Minitest::Test
@@ -13,14 +13,14 @@ class Rack::GridFSTest < Minitest::Test
     end
 
     should "load artifacts" do
-      image_id = load_artifact('3wolfmoon.jpg', 'image/jpeg')
+      image_id = load_artifact_return_id('3wolfmoon.jpg', 'image/jpeg')
 
-      file1 = Mongo::Grid.new(db).get(image_id)
-      file2 = Mongo::GridFileSystem.new(db).open('3wolfmoon.jpg', "r")
-      file3 = Mongo::Grid.new(db).get(BSON::ObjectId.from_string(image_id.to_s))
+      file1 = db.fs.open_download_stream(image_id)
+      file2 = db.fs.open_download_stream_by_name("3wolfmoon.jpg")
+      file3 = db.fs.open_download_stream(BSON::ObjectId.from_string(image_id.to_s))
 
-      assert_equal file1.filename, file2.filename
-      assert_equal file2.filename, file3.filename
+      assert_equal file1.file_info.filename, file2.file_info.filename
+      assert_equal file2.file_info.filename, file3.file_info.filename
     end
 
     should "delegate requests with a non-matching prefix" do
@@ -33,12 +33,12 @@ class Rack::GridFSTest < Minitest::Test
 
     context "for lookup by ObjectId" do
       setup do
-        @text_id = load_artifact('test.txt', 'text/plain')
-        @html_id = load_artifact('test.html', 'text/html')
+        @text_id = load_artifact_return_id('test.txt', 'text/plain')
+        @html_id = load_artifact_return_id('test.html', 'text/html')
       end
 
       teardown do
-        db.collection('fs.files').remove
+        db["fs.files"].delete_many
       end
 
       should "return TXT files stored in GridFS" do
@@ -53,7 +53,7 @@ class Rack::GridFSTest < Minitest::Test
 
       should "return HTML files stored in GridFS" do
         get "/gridfs/#{@html_id}"
-        assert_match /html.*?body.*Test/m, last_response.body
+        assert_match(/html.*?body.*Test/m, last_response.body)
       end
 
       should "return the proper content type for HTML files" do
@@ -71,31 +71,31 @@ class Rack::GridFSTest < Minitest::Test
     context "for lookup by filename" do
       setup do
         def app; setup_middleware(:lookup => :path) end
-        @text_file = load_artifact('test.txt', nil, path='text')
-        @html_file = load_artifact('test.html', nil, path='html')
+        @text_file = load_artifact_return_stream('test.txt', 'text/plain', path='text')
+        @html_file = load_artifact_return_stream('test.html', 'text/html', path='html')
       end
 
       teardown do
-        db.collection('fs.files').remove
+        db["fs.files"].delete_many
       end
 
       should "return TXT files stored in GridFS" do
-        get "/gridfs/#{@text_file.filename}"
+        get "/gridfs/#{@text_file.file_info.filename}"
         assert_equal "Lorem ipsum dolor sit amet.", last_response.body
       end
 
       should "return the proper content type for TXT files" do
-        get "/gridfs/#{@text_file.filename}"
+        get "/gridfs/#{@text_file.file_info.filename}"
         assert_equal 'text/plain', last_response.content_type
       end
 
       should "return HTML files stored in GridFS" do
-        get "/gridfs/#{@html_file.filename}"
+        get "/gridfs/#{@html_file.file_info.filename}"
         assert_match /html.*?body.*Test/m, last_response.body
       end
 
       should "return the proper content type for HTML files" do
-        get "/gridfs/#{@html_file.filename}"
+        get "/gridfs/#{@html_file.file_info.filename}"
         assert_equal 'text/html', last_response.content_type
       end
 
@@ -105,8 +105,8 @@ class Rack::GridFSTest < Minitest::Test
       end
 
       should "work for small images" do
-        image_id = load_artifact('3wolfmoon.jpg', nil, 'images')
-        get "/gridfs/#{image_id.filename}"
+        image = load_artifact_return_stream('3wolfmoon.jpg', 'image/jpeg', 'images')
+        get "/gridfs/#{image.file_info.filename}"
         assert last_response.ok?
         assert_equal 'image/jpeg', last_response.content_type
       end
@@ -118,11 +118,11 @@ class Rack::GridFSTest < Minitest::Test
     context "for lookup by ObjectId" do
       setup do
         def app; setup_endpoint end
-        @text_id = load_artifact('test.txt', 'text/plain')
+        @text_id = load_artifact_return_id('test.txt', 'text/plain')
       end
 
       teardown do
-        db.collection('fs.files').remove
+        db["fs.files"].delete_many
       end
 
       should "return TXT files stored in GridFS" do
@@ -144,26 +144,26 @@ class Rack::GridFSTest < Minitest::Test
     context "for lookup by filename" do
       setup do
         def app; setup_endpoint(:lookup => :path) end
-        @text_file = load_artifact('test.txt', nil, path='text')
+        @text_file = load_artifact_return_stream('test.txt', 'text/plain', path='text')
       end
 
       teardown do
-        db.collection('fs.files').remove
+        db["fs.files"].delete_many
       end
 
       should "return TXT files stored in GridFS" do
-        get "/gridfs/#{@text_file.filename}"
+        get "/gridfs/#{@text_file.file_info.filename}"
         assert_equal "Lorem ipsum dolor sit amet.", last_response.body
       end
 
       should "return the proper content type for TXT files" do
-        get "/gridfs/#{@text_file.filename}"
+        get "/gridfs/#{@text_file.file_info.filename}"
         assert_equal 'text/plain', last_response.content_type
       end
 
       should "return TXT with non-ascii filename files stored in GridFS" do
-        @rus_text_file = load_artifact('тест.txt', nil, path='text')
-        get "/gridfs/#{CGI::escape(@rus_text_file.filename)}"
+        @rus_text_file = load_artifact_return_stream('тест.txt', nil, path='text')
+        get "/gridfs/#{CGI::escape(@rus_text_file.file_info.filename)}"
         assert_equal "Lorem ipsum dolor sit amet.", last_response.body
       end
 
@@ -175,4 +175,3 @@ class Rack::GridFSTest < Minitest::Test
   end
 
 end
-

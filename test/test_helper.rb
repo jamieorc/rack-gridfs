@@ -1,6 +1,9 @@
 require 'minitest/autorun'
+require 'minitest/unit'
+require "minitest/rg"
 require 'shoulda/context'
-require 'mocha/mini_test'
+require 'mocha'
+require 'mocha/minitest'
 
 require 'rack/builder'
 require 'rack/mock'
@@ -25,11 +28,12 @@ module Rack
         end
 
         def test_database_options
-          { :hostname => 'localhost', :port => 27017, :database => 'test', :prefix => 'gridfs' }
+          { hostname: "localhost", port: 27017, database: "rack_gridfs_test", prefix: "gridfs" }
         end
 
         def db
-          @db ||= Mongo::Connection.new(test_database_options[:hostname], test_database_options[:port]).db(test_database_options[:database])
+          db_address = "#{test_database_options[:hostname]}:#{test_database_options[:port]}"
+          @db ||= Mongo::Client.new([db_address], database: test_database_options[:database]).database
         end
 
         def setup_middleware(opts={})
@@ -56,16 +60,22 @@ module Rack
           end
         end
 
-        def load_artifact(filename, content_type, path=nil)
-          contents = ::File.read(::File.join(::File.dirname(__FILE__), 'artifacts', filename))
-          if path
-            grid = Mongo::GridFileSystem.new(db)
-            file = [path, filename].join('/')
-            grid.open(file, 'w') { |f| f.write contents }
-            grid.open(file, 'r')
-          else
-            Mongo::Grid.new(db).put(contents, :filename => filename, :content_type => content_type)
-          end
+        def load_artifact_return_id(filename, content_type)
+          contents = contents(filename)
+          db.fs.upload_from_stream(filename, contents, content_type: content_type)
+        end
+
+        def load_artifact_return_stream(filename, content_type, path=nil)
+          contents = contents(filename)
+          # db.fs => Mongo::Grid::FSBucket.new(db)
+          file = [path, filename].join('/')
+          bucket = db.fs
+          bucket.open_upload_stream(file, content_type: content_type){ |f| f.write(contents) }
+          bucket.open_download_stream_by_name(file)
+        end
+
+        def contents(filename)
+          ::File.read(::File.join(::File.dirname(__FILE__), 'artifacts', filename))
         end
 
         def assert_cache_control(cache_control)
