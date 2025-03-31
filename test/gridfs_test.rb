@@ -91,7 +91,7 @@ class Rack::GridFSTest < Minitest::Test
 
       should "return HTML files stored in GridFS" do
         get "/gridfs/#{@html_file.file_info.filename}"
-        assert_match /html.*?body.*Test/m, last_response.body
+        assert_match(/html.*?body.*Test/m, last_response.body)
       end
 
       should "return the proper content type for HTML files" do
