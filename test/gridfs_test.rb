@@ -8,64 +8,65 @@ class Rack::GridFSTest < Minitest::Test
   include Rack::GridFS::Test::Methods
 
   context "Rack::GridFS" do
-    setup do
-      def app; setup_middleware end
-    end
-
-    should "load artifacts" do
-      image_id = load_artifact_return_id('3wolfmoon.jpg', 'image/jpeg')
-
-      file1 = db.fs.open_download_stream(image_id)
-      file2 = db.fs.open_download_stream_by_name("3wolfmoon.jpg")
-      file3 = db.fs.open_download_stream(BSON::ObjectId.from_string(image_id.to_s))
-
-      assert_equal file1.file_info.filename, file2.file_info.filename
-      assert_equal file2.file_info.filename, file3.file_info.filename
-    end
-
-    should "delegate requests with a non-matching prefix" do
-      %w( / /posts /posts/1 /posts/1/comments ).each do |path|
-        get path
-        assert last_response.ok?
-        assert 'Hello, World!', last_response.body
-      end
-    end
-
-    context "for lookup by ObjectId" do
+    context "for lookup by id" do
       setup do
-        @text_id = load_artifact_return_id('test.txt', 'text/plain')
-        @html_id = load_artifact_return_id('test.html', 'text/html')
+        def app; setup_middleware end
       end
 
-      teardown do
-        db["fs.files"].delete_many
+      should "load artifacts" do
+        image_id = load_artifact_return_id('3wolfmoon.jpg', 'image/jpeg')
+
+        file1 = db.fs.open_download_stream(image_id)
+        file2 = db.fs.open_download_stream_by_name("3wolfmoon.jpg")
+        file3 = db.fs.open_download_stream(BSON::ObjectId.from_string(image_id.to_s))
+
+        assert_equal file1.file_info.filename, file2.file_info.filename
+        assert_equal file2.file_info.filename, file3.file_info.filename
       end
 
-      should "return TXT files stored in GridFS" do
-        get "/gridfs/#{@text_id}"
-        assert_equal "Lorem ipsum dolor sit amet.", last_response.body
+      should "delegate requests with a non-matching prefix" do
+        %w( / /posts /posts/1 /posts/1/comments ).each do |path|
+          get path
+          assert last_response.ok?
+          assert 'Hello, World!', last_response.body
+        end
       end
 
-      should "return the proper content type for TXT files" do
-        get "/gridfs/#{@text_id}"
-        assert_equal 'text/plain', last_response.content_type
-      end
+      context "for lookup by ObjectId" do
+        setup do
+          @text_id = load_artifact_return_id('test.txt', 'text/plain')
+          @html_id = load_artifact_return_id('test.html', 'text/html')
+        end
 
-      should "return HTML files stored in GridFS" do
-        get "/gridfs/#{@html_id}"
-        assert_match(/html.*?body.*Test/m, last_response.body)
-      end
+        teardown do
+          db["fs.files"].delete_many
+        end
 
-      should "return the proper content type for HTML files" do
-        get "/gridfs/#{@html_id}"
-        assert_equal 'text/html', last_response.content_type
-      end
+        should "return TXT files stored in GridFS" do
+          get "/gridfs/#{@text_id}"
+          assert_equal "Lorem ipsum dolor sit amet.", last_response.body
+        end
 
-      should "return a not found for a unknown path" do
-        get '/gridfs/unknown'
-        assert last_response.not_found?
-      end
+        should "return the proper content type for TXT files" do
+          get "/gridfs/#{@text_id}"
+          assert_equal 'text/plain', last_response.content_type
+        end
 
+        should "return HTML files stored in GridFS" do
+          get "/gridfs/#{@html_id}"
+          assert_match(/html.*?body.*Test/m, last_response.body)
+        end
+
+        should "return the proper content type for HTML files" do
+          get "/gridfs/#{@html_id}"
+          assert_equal 'text/html', last_response.content_type
+        end
+
+        should "return a not found for a unknown path" do
+          get '/gridfs/unknown'
+          assert last_response.not_found?
+        end
+      end
     end
 
     context "for lookup by filename" do
