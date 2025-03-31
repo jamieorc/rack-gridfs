@@ -11,10 +11,12 @@ require 'rack/test'
 
 require 'rack/gridfs'
 
-class Hash
-  def except(*keys)
-    rejected = Set.new(respond_to?(:convert_key) ? keys.map { |key| convert_key(key) } : keys)
-    reject { |key,| rejected.include?(key) }
+if RUBY_VERSION.split(".").first.to_i < 3
+  class Hash
+    def except(*keys)
+      rejected = Set.new(respond_to?(:convert_key) ? keys.map { |key| convert_key(key) } : keys)
+      reject { |key,| rejected.include?(key) }
+    end
   end
 end
 
