@@ -5,3 +5,6 @@ Gemfile.lock
 coverage
 doc/
 .yardoc/
+.ruby-version
+.ruby-gemset
+.solargraph.yml
